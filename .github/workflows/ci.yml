@@ -226,7 +226,7 @@ jobs:
         env:
           GHCR_USERNAME: ${{ github.repository_owner }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: sha-${{ github.sha }}
 
         with:
           host: ${{ secrets.SERVER_HOST }}
