@@ -14,7 +14,7 @@ COPY . .
 
 # Backend API address.
 # This is used by next.config.ts during the build.
-ARG API_PROXY_TARGET=http://host.docker.internal:8000
+ARG API_PROXY_TARGET=http://backend:8000
 ENV API_PROXY_TARGET=${API_PROXY_TARGET}
 
 ENV NEXT_TELEMETRY_DISABLED=1
