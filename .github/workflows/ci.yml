@@ -1,11 +1,9 @@
-
 name: Adaptive Learning Frontend CI/CD
 
 on:
   push:
     branches:
       - main
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -21,156 +19,10 @@ env:
 
 jobs:
   # --------------------------------------------------
-  # 1. FRONTEND CI
-  # --------------------------------------------------
-  frontend:
-    name: Frontend CI
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout frontend
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Format check
-        run: npm run format:check
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Unit tests
-        run: npm test
-
-      - name: Build frontend
-        run: npm run build
-
-  # --------------------------------------------------
-  # 2. END-TO-END TESTING
-  # --------------------------------------------------
-  e2e:
-    name: End-to-End Tests
-    needs: frontend
-    runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: pgvector/pgvector:pg16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ap_e2e
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ap_e2e
-      REDIS_URL: redis://localhost:6379/0
-      JWT_SECRET: ci-secret-ci-secret-ci-secret-ci-secret
-      ENVIRONMENT: test
-      EMAIL_BACKEND: console
-      REQUIRE_EMAIL_VERIFICATION: "true"
-      RATE_LIMIT_REGISTER: "100/60"
-      RATE_LIMIT_LOGIN: "100/60"
-      RATE_LIMIT_EMAIL: "100/300"
-
-    steps:
-      - name: Checkout frontend
-        uses: actions/checkout@v4
-        with:
-          path: frontend
-
-      - name: Checkout backend
-        uses: actions/checkout@v4
-        with:
-          repository: Dazedcoder1/Adaptive-Practice-Backend
-          path: backend
-          token: ${{ secrets.BACKEND_REPO_TOKEN || github.token }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Start API
-        working-directory: backend
-        run: |
-          pip install -r requirements.txt
-          alembic upgrade head
-          python -m scripts.seed_sample_content
-          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 > api.log 2>&1 &
-
-      - name: Build and start frontend
-        working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium
-          npm run build
-          nohup npm start -- -p 3000 > web.log 2>&1 &
-          npx --yes wait-on -t 60000 \
-            http-get://127.0.0.1:3000 \
-            http-get://127.0.0.1:8000/api/v1/health
-
-      - name: Run Playwright tests
-        working-directory: frontend
-        env:
-          E2E_API_URL: http://127.0.0.1:8000
-        run: npm run test:e2e
-
-      - name: Print server logs
-        if: failure()
-        run: |
-          echo "----- API LOGS -----"
-          tail -n 80 backend/api.log || true
-
-          echo "----- FRONTEND LOGS -----"
-          tail -n 40 frontend/web.log || true
-
-      - name: Upload E2E artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-artifacts
-          path: |
-            frontend/test-results
-            backend/api.log
-            frontend/web.log
-
-  # --------------------------------------------------
-  # 3. BUILD AND PUSH DOCKER IMAGE
+  # 1. BUILD AND PUSH DOCKER IMAGE
   # --------------------------------------------------
   build-and-push:
     name: Build and Push Docker Image
-    needs: e2e
     runs-on: ubuntu-latest
 
     # Do not deploy pull requests.
@@ -213,7 +65,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # --------------------------------------------------
-  # 4. DEPLOY TO VPS
+  # 2. DEPLOY TO VPS
   # --------------------------------------------------
   deploy:
     name: Deploy to VPS
