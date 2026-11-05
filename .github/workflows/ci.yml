@@ -1,3 +1,4 @@
+
 name: Adaptive Learning Frontend CI/CD
 
 on:
@@ -25,7 +26,6 @@ jobs:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
 
-    # Do not deploy pull requests.
     if: github.ref == 'refs/heads/main'
 
     steps:
@@ -60,7 +60,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            API_PROXY_TARGET=http://backend:8000
+            API_PROXY_TARGET=${{ vars.API_PROXY_TARGET || 'http://backend:8000' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -75,6 +75,7 @@ jobs:
     steps:
       - name: Deploy using SSH
         uses: appleboy/ssh-action@v1.2.0
+
         env:
           GHCR_USERNAME: ${{ github.repository_owner }}
           GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
@@ -91,17 +92,48 @@ jobs:
           script: |
             set -e
 
+            echo "Starting Adaptive Learning frontend deployment..."
+
             cd /root/adaptive-learning/frontend
 
+            # Login to GitHub Container Registry
             echo "$GHCR_READ_TOKEN" | docker login ghcr.io \
               -u "$GHCR_USERNAME" \
               --password-stdin
 
+            # Deploy the exact image built by this workflow
             export IMAGE_TAG="$IMAGE_TAG"
 
+            docker compose config -q
             docker compose pull
             docker compose up -d --remove-orphans
 
+            # Verify frontend and API proxy
+            echo "Checking frontend and backend connectivity..."
+
+            ATTEMPTS=30
+
+            for i in $(seq 1 $ATTEMPTS); do
+              if curl -fsS http://127.0.0.1:8306/api/v1/health; then
+                echo ""
+                echo "Frontend and backend API are responding successfully."
+                break
+              fi
+
+              if [ "$i" -eq "$ATTEMPTS" ]; then
+                echo "Deployment health check failed."
+
+                docker compose ps
+                docker compose logs --tail=100 adaptive-frontend
+
+                exit 1
+              fi
+
+              echo "Waiting for application... ($i/$ATTEMPTS)"
+              sleep 2
+            done
+
+            # Remove unused images
             docker image prune -f
 
             echo "Adaptive Learning frontend deployed successfully."
