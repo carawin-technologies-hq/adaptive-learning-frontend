@@ -60,7 +60,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            API_PROXY_TARGET=${{ vars.API_PROXY_TARGET || 'http://host.docker.internal:8000' }}
+            API_PROXY_TARGET=http://backend:8000
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
