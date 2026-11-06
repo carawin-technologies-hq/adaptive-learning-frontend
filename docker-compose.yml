@@ -1,19 +1,23 @@
 
+name: adaptive-learning
+
 services:
   adaptive-frontend:
     image: ghcr.io/carawin-technologies-hq/adaptive-learning-frontend:${IMAGE_TAG:-latest}
-    container_name: adaptive-frontend
+    container_name: adaptive-learning-frontend
     restart: unless-stopped
     init: true
 
     ports:
       - "127.0.0.1:8306:3000"
 
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
 
     networks:
-      - adaptive-network
+      - adaptive-backend
 
     healthcheck:
       test:
@@ -27,6 +31,6 @@ services:
       start_period: 20s
 
 networks:
-  adaptive-network:
+  adaptive-backend:
     external: true
-    name: adaptive-network
+    name: adaptive-learning-backend_default
